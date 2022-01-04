@@ -9,7 +9,6 @@
 
 # FIXME: FIXMEs in code
 # FIXME: add README.md, COPYING
-# FIXME: speedup! originally 14+ minutes, while bzcat is 1minute, and pbzip2 -dc is 15 seconds! Down to 6 minutes with libxml-sax-expatxs-perl, and to 2.5 minutes with XML::Parser instead.
 # FIXME: cmdline arguments for FILTER_BBOX, FILTER_USERS
 # FIXME: cron example (and install cron)
 
@@ -25,7 +24,7 @@ use Encode;
 use Date::Parse qw /str2time/;
 #use Data::Dumper;
 
-$ENV{'PATH'} = '/usr/bin:/bin';
+$ENV{'PATH'} = '/usr/local/bin:/usr/bin:/bin';
 
 my $PICTURE_DIR = './images';
 my $MAX_AGE_DAYS = 14;	# ignore pictures in notes older than this many days
@@ -45,6 +44,7 @@ my $OSN_FILE = 'OK.planet-notes-latest.osn.bz2';
 #
 
 my $DEBUG = $ENV{DEBUG} || 0;
+
 my $pic_count = undef;
 my $last_noteid = undef;
 my $last_date = undef;
@@ -87,34 +87,32 @@ exit 0;
 # when a '<foo>' is seen
 sub start_element
 {
-    my( $parseinst, $element, %attrs ) = @_;
-    SWITCH: {
-           if ($element eq 'note') {
-                   $last_noteid	= $attrs{'id'};
-                   $last_lat	= $attrs{'lat'};
-                   $last_lon	= $attrs{'lon'};
-                   $last_date	= undef;
-                   $last_user	= undef;
-                   $last_string = undef;
-                   $pic_count	= 0;		# each new note starts counting pictures from 1
-                   $DEBUG > 9 && say "New Note $last_noteid at $last_lat,$last_lon:";
-                   last SWITCH;
-           }
+    my ($parseinst, $element, %attrs) = @_;
+    if ($element eq 'note') {
+            $last_noteid	= $attrs{'id'};
+            $last_lat		= $attrs{'lat'};
+            $last_lon		= $attrs{'lon'};
+            $last_date		= undef;
+            $last_user		= undef;
+            $last_string	= undef;
+            $pic_count		= 0;		# each new note starts counting pictures from 1
+            $DEBUG > 9 && say "New Note $last_noteid at $last_lat,$last_lon:";
+            return;
+    }
 
-           if ($element eq 'comment') {
-                   $last_date	= $attrs{'timestamp'};
-                   $last_user	= $attrs{'user'} || '';
-                   $last_string = '';
-                   $DEBUG > 9 && say "  New comment by $last_user on $last_date";
-                   last SWITCH;
-           }
+    if ($element eq 'comment') {
+            $last_date		= $attrs{'timestamp'};
+            $last_user		= $attrs{'user'} || '';
+            $last_string	= '';
+            $DEBUG > 9 && say "  New comment by $last_user on $last_date";
+            return;
     }
 }
 
 # content of a element (stuff between <foo> and </foo>) - may be multiple, so concat() it!
 sub characters
 {
-    my( $parseinst, $data ) = @_;
+    my ($parseinst, $data) = @_;
     $last_string .= $data;
 }
 
@@ -162,8 +160,8 @@ sub save_pic($) {
 # when a '</foo>' is seen
 sub end_element
 {
-    my( $parseinst, $element ) = @_;
+    my ($parseinst, $element) = @_;
     if ($element eq 'comment') {
-        $last_string =~ s{\b(https?://.*?\.jpg)\b}{save_pic($1)}ge if defined $last_string;
+        $last_string =~ s{\b(https?://.*?\.jpg)\b}{save_pic($1)}ge if defined $last_string;	# call save_pic($url) for each URL containing .jpg  picture; we don't care about final value of $last_string
     }
 }
