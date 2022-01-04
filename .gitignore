@@ -6,3 +6,6 @@ planet-notes-latest.osn.bz2.md5
 *.tmp
 .#.*
 images/
+example*.xml*
+log_*
+timing.*
