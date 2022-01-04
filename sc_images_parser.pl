@@ -46,7 +46,6 @@ $OSN_FILE = 'example2.xml.bz2';	# FIXME DELME
 
 my $DEBUG = $ENV{DEBUG} || 0;
 my $pic_count = undef;
-my $last_tag = '';
 my $last_noteid = undef;
 my $last_date = undef;
 my $last_lat = undef;
@@ -91,7 +90,6 @@ sub start_element
     my( $parseinst, $element, %attrs ) = @_;
     SWITCH: {
            if ($element eq 'note') {
-                   $last_tag	= 'note';
                    $last_noteid	= $attrs{'id'};
                    $last_lat	= $attrs{'lat'};
                    $last_lon	= $attrs{'lon'};
@@ -104,7 +102,6 @@ sub start_element
            }
 
            if ($element eq 'comment') {
-                   $last_tag	= 'comment';
                    $last_date	= $attrs{'timestamp'};
                    $last_user	= $attrs{'user'} || '';
                    $last_string = '';
@@ -118,9 +115,7 @@ sub start_element
 sub characters
 {
     my( $parseinst, $data ) = @_;
-    if ($last_tag eq 'comment') {
-        $last_string .= $data;
-    }
+    $last_string .= $data;
 }
 
 # save each detected picture
