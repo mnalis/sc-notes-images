@@ -4,15 +4,14 @@
 # parses OSM notes planet dump and locally cache StreetComplete images linked,
 # by Matija Nalis <mnalis-git-openstreetmap@voyager.hr> GPLv3+ 2021-12-24+
 #
-# Requirements (Debian): sudo apt-get install libxml-sax-perl wget exiftool
+# Requirements (Debian): sudo apt-get install libxml-sax-perl wget exiftool libxml-sax-expatxs-perl
 #
 
 # FIXME: FIXMEs in code
 # FIXME: add README.md, COPYING
-# FIXME: speedup! currently 14+ minutes, while bzcat i 1minute, and pbzip2 -dc is 15 seconds!
+# FIXME: speedup! orignally 14+ minutes, while bzcat is 1minute, and pbzip2 -dc is 15 seconds! Down to 6 minutes with libxml-sax-expatxs-perl
 # FIXME: cmdline arguments for FILTER_BBOX, FILTER_USERS
 # FIXME: cron example (and install cron)
-# FIXME: restore smaller MAX_AGE_DAYS = 14 ?
 
 use utf8;
 
@@ -26,9 +25,8 @@ use XML::SAX;
 
 $ENV{'PATH'} = '/usr/bin:/bin';
 
-my $IMGLIST_FILE = 'img_in.txt';
 my $PICTURE_DIR = './images';
-my $MAX_AGE_DAYS = 30;	# ignore pictures in notes older than this many days
+my $MAX_AGE_DAYS = 14;	# ignore pictures in notes older than this many days
 
 #my %FILTER_USERS = map { $_ => 1 } ('Matija Nalis', 'mnalis ALTernative');
 my %FILTER_USERS = ();
@@ -38,6 +36,7 @@ my %FILTER_BBOX = ( lon_min => 12.7076, lat_min => 41.6049, lon_max => 19.7065, 
 
 
 my $OSN_FILE = 'OK.planet-notes-latest.osn.bz2';
+$OSN_FILE = 'example2.xml.bz2';	# FIXME DELME
 
 #
 # No user serviceable parts below
@@ -47,7 +46,7 @@ my $DEBUG = $ENV{DEBUG} || 0;
 my $pic_count = undef;
 my $count = 0;
 my $start_time = time;
-say 'parsing... ';
+say "parsing $OSN_FILE... ";
 
 #open my $xml_file, '-|', "bzcat $OSN_FILE";
 open my $xml_file, '-|', "pbzip2 -dc $OSN_FILE";
@@ -59,9 +58,6 @@ my $parser = XML::SAX::ParserFactory->parser(
 );
 
 #use open qw( :encoding(UTF-8) :std );
-
-{ no autodie qw(unlink); unlink $IMGLIST_FILE; }
-open my $img_file, '>', $IMGLIST_FILE;
 
 $parser->parse_file($xml_file);
 
@@ -89,8 +85,7 @@ use warnings;
 # when a '<foo>' is seen
 sub start_element
 {
-   my $this = shift;
-   my $tag = shift;
+   my ($this, $tag) = @_;
    
    if ($tag->{'LocalName'} eq 'note') {
      $pic_count = 0;	# each new note starts counting pictures from 1
@@ -125,8 +120,7 @@ sub start_element
 # content of a element (stuff between <foo> and </foo>) - may be multiple, so concat() it!
 sub characters
 {
-   my $this = shift;
-   my $tag = shift;
+   my ($this, $tag) = @_;
    $this->{'text'} .= $tag->{'Data'};
 }
 
@@ -178,17 +172,8 @@ sub save_pic($$) {
 # when a '</foo>' is seen
 sub end_element
 {
-   my $this = shift;
-   my $tag = shift;
+   my ($this, $tag) = @_;
 
-   #if ($tag->{LocalName} eq 'note') {
-   #  if ($this->{'last_action'} eq 'opened') {	# we're only interested in (re-)opened notes!
-   #     #if ($count++ > 999) { say "exiting on $count for DEBUG, FIXME"; exit 0;} ; print "[$count] ";
-   #     #say "end_note (non-closed), last note_id=" . $this->{'note_ID'} . ", first_text=" . $this->{'first_text'} . ", last_date=" . $this->{'last_date'};
-   #     #print '.';
-   #  }
-   #}
-   
   if ($tag->{'LocalName'} eq 'comment') {
     #say 'end_comment[' . $this->{'note_ID'} .  '], full text=' . $this->{'text'};	# full text of this comment
     if (defined $this->{'text'}) {
