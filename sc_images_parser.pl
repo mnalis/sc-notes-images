@@ -20,7 +20,9 @@ use warnings;
 use autodie;
 use feature 'say';
 
-use XML::SAX;
+use XML::Parser;
+use Encode;
+use Date::Parse qw /str2time/;
 #use Data::Dumper;
 
 $ENV{'PATH'} = '/usr/bin:/bin';
@@ -36,7 +38,7 @@ my %FILTER_BBOX = ( lon_min => 12.7076, lat_min => 41.6049, lon_max => 19.7065, 
 
 
 my $OSN_FILE = 'OK.planet-notes-latest.osn.bz2';
-$OSN_FILE = 'example2.xml.bz2';	# FIXME DELME
+#$OSN_FILE = 'example2.xml.bz2';	# FIXME DELME
 
 #
 # No user serviceable parts below
@@ -44,7 +46,14 @@ $OSN_FILE = 'example2.xml.bz2';	# FIXME DELME
 
 my $DEBUG = $ENV{DEBUG} || 0;
 my $pic_count = undef;
-my $count = 0;
+my $last_tag = '';
+my $last_noteid = undef;
+my $last_date = undef;
+my $last_lat = undef;
+my $last_lon = undef;
+my $last_user = undef;
+my $last_string = undef;
+
 my $start_time = time;
 say "parsing $OSN_FILE... ";
 
@@ -53,13 +62,17 @@ open my $xml_file, '-|', "pbzip2 -dc $OSN_FILE";
 
 binmode STDOUT, ":utf8"; 
 
-my $parser = XML::SAX::ParserFactory->parser(
-  Handler => SAX_OSM_Notes->new
-);
+my $parser = new XML::Parser;
+
+$parser->setHandlers( Start => \&start_element,
+                      End => \&end_element,
+                      Char => \&characters,
+#                      Default => \&default
+                    );
 
 #use open qw( :encoding(UTF-8) :std );
 
-$parser->parse_file($xml_file);
+$parser->parse($xml_file);
 
 say 'completed in ' . (time - $start_time) . ' seconds.';
 
@@ -69,69 +82,62 @@ exit 0;
 
 
 #########################################
-######### SAX parser below ##############
+######### XML parser below ##############
 #########################################
 
-package SAX_OSM_Notes;
-
-use base qw(XML::SAX::Base);
-use Encode;
-use Date::Parse qw /str2time/;
-#use Data::Dumper;
-
-use strict;
-use warnings;
 
 # when a '<foo>' is seen
 sub start_element
 {
-   my ($this, $tag) = @_;
-   
-   if ($tag->{'LocalName'} eq 'note') {
-     $pic_count = 0;	# each new note starts counting pictures from 1
-     my $note_id = $tag->{'Attributes'}{'{}id'}{'Value'};
-     #say "\n/mn/ start note_id=$note_id";
-     $this->{'note_ID'} = $note_id;
-     $this->{'last_date'} = undef;
-     %{$this->{'users'}} = ();
-     $this->{'lat'} = $tag->{'Attributes'}{'{}lat'}{'Value'};
-     $this->{'lon'} = $tag->{'Attributes'}{'{}lon'}{'Value'};
-     #Dumper($tag->{Attributes})
-   }
-   
-   if ($tag->{'LocalName'} eq 'comment') {
-     my $user_id = $tag->{'Attributes'}{'{}user'}{'Value'};
-     my $action = $tag->{'Attributes'}{'{}action'}{'Value'};
-     $this->{'last_action'} = $1 if $action =~ /^(?:re)?(opened|closed)$/;
-     $this->{'text'} = '';
-     if (defined($user_id)) {
-       #say "  comment by user_id=$user_id, note_id=" . $this->{'note_ID'};
-       $this->{'users'}{$user_id} = 1;
-       $this->{'last_user'} = $user_id;
-     }
-     $this->{'last_date'} = $tag->{'Attributes'}{'{}timestamp'}{'Value'};
-     #say '   comment timestamp: '  . $this->{'last_date'};
-   }
-   
-   # call the super class to properly handle the event
-   return $this->SUPER::start_element($tag)
+    my( $parseinst, $element, %attrs ) = @_;
+    SWITCH: {
+           if ($element eq 'note') {
+                   $last_tag	= 'note';
+                   $last_noteid	= $attrs{'id'};
+                   $last_lat	= $attrs{'lat'};
+                   $last_lon	= $attrs{'lon'};
+                   $last_date	= undef;
+                   $last_user	= undef;
+                   $last_string = undef;
+                   $pic_count	= 0;		# each new note starts counting pictures from 1
+                   $DEBUG > 9 && say "New Note $last_noteid at $last_lat,$last_lon:";
+                   last SWITCH;
+           }
+
+           if ($element eq 'comment') {
+                   $last_tag	= 'comment';
+                   $last_date	= $attrs{'timestamp'};
+                   $last_user	= $attrs{'user'} || '';
+                   $last_string = undef;
+                   $DEBUG > 9 && say "  New comment by $last_user on $last_date";
+                   last SWITCH;
+           }
+    }
 }
 
 # content of a element (stuff between <foo> and </foo>) - may be multiple, so concat() it!
 sub characters
 {
-   my ($this, $tag) = @_;
-   $this->{'text'} .= $tag->{'Data'};
+    my( $parseinst, $data ) = @_;
+    if ($last_tag eq 'comment') {
+        $last_string .= $data;
+    }
+}
+
+# called for unregistered handlers, eg. markup declarations etc.
+sub default {
+    my( $parseinst, $data ) = @_;
+    # do nothing, but stay quiet
 }
 
 # save each detected picture
-sub save_pic($$) {
-   my ($this, $url) = @_;
-   my $note_id = $this->{'note_ID'};
-   my $note_epoch = str2time($this->{'last_date'});
-   my $lon = $this->{'lon'};
-   my $lat = $this->{'lat'};
-   my $user = $this->{'last_user'};
+sub save_pic($) {
+   my ($url) = @_;
+   my $note_id = $last_noteid;
+   my $note_epoch = str2time($last_date);
+   my $lon = $last_lon;
+   my $lat = $last_lat;
+   my $user = $last_user;
    
    my $diff_days = int ((time() - $note_epoch) / 86400);
    $pic_count++;	# N.B. needs to always increment it, even if not processing picture, or we'll miscount when we partly pass $MAX_AGE_DAYS
@@ -172,17 +178,8 @@ sub save_pic($$) {
 # when a '</foo>' is seen
 sub end_element
 {
-   my ($this, $tag) = @_;
-
-  if ($tag->{'LocalName'} eq 'comment') {
-    #say 'end_comment[' . $this->{'note_ID'} .  '], full text=' . $this->{'text'};	# full text of this comment
-    if (defined $this->{'text'}) {
-       $this->{'text'} =~ s{\b(https?://.*?\.jpg)\b}{save_pic($this,$1)}ge;
+    my( $parseinst, $element ) = @_;
+    if ($element eq 'comment') {
+        $last_string =~ s{\b(https?://.*?\.jpg)\b}{save_pic($1)}ge if defined $last_string;
     }
-    #say "comment tag=" . Dumper($tag);
-  }
-      
-   return $this->SUPER::end_element($tag)
 }
-
-1;
