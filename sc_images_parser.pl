@@ -1,15 +1,15 @@
 #!/usr/bin/perl -T
 # initial code from https://github.com/osm-hr/my-osm-notes by Matija Nalis <mnalis-git-openstreetmap@voyager.hr> GPLv3+ 2015-2020
 # 
-# parses OSM notes planet dump and locally cache StreetComplete images linked,
+# parses OSM notes planet dump and geotag & locally cache StreetComplete images linked
 # by Matija Nalis <mnalis-git-openstreetmap@voyager.hr> GPLv3+ 2021-12-24+
 #
-# Requirements (Debian): sudo apt-get install libxml-sax-perl wget exiftool libxml-sax-expatxs-perl
+# Requirements (Debian): sudo apt-get install libxml-parser-perl wget exiftool
 #
 
 # FIXME: FIXMEs in code
 # FIXME: add README.md, COPYING
-# FIXME: speedup! orignally 14+ minutes, while bzcat is 1minute, and pbzip2 -dc is 15 seconds! Down to 6 minutes with libxml-sax-expatxs-perl
+# FIXME: speedup! originally 14+ minutes, while bzcat is 1minute, and pbzip2 -dc is 15 seconds! Down to 6 minutes with libxml-sax-expatxs-perl, and to 2.5 minutes with XML::Parser instead.
 # FIXME: cmdline arguments for FILTER_BBOX, FILTER_USERS
 # FIXME: cron example (and install cron)
 
@@ -38,7 +38,7 @@ my %FILTER_BBOX = ( lon_min => 12.7076, lat_min => 41.6049, lon_max => 19.7065, 
 
 
 my $OSN_FILE = 'OK.planet-notes-latest.osn.bz2';
-$OSN_FILE = 'example2.xml.bz2';	# FIXME DELME
+#$OSN_FILE = 'example2.xml.bz2';	# FIXME DELME
 
 #
 # No user serviceable parts below
