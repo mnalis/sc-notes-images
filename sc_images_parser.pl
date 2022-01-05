@@ -63,10 +63,11 @@ if (my @b = split /, */, $opt_filter_bbox) {
     $FILTER_BBOX{'lat_max'} = shift @b;
 }
 
+usage() if $opt_help or !$OSN_FILE;
+
 die "Directory --picdir=$PICTURE_DIR must exist" unless -d $PICTURE_DIR;
 die "You should use either --bbox or --user to filter results" if !$opt_filter_bbox and !@opt_filter_user;
 
-usage() if $opt_help or !$OSN_FILE;
 
 
 
