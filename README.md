@@ -12,3 +12,6 @@ or
 
 
 Use `sc_images_parser.pl --help` for help
+
+---
+For full-flow example of using it with StreetComplete notes, see https://github.com/streetcomplete/StreetComplete/issues/2880#issuecomment-1586164079
