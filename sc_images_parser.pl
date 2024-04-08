@@ -178,7 +178,7 @@ sub save_pic($) {
       $DEBUG > 0 && say "Note $last_noteid: Downloading $url to $pic_file, and adding GPS coordinates";
       system 'wget', '-q', '--no-clobber', $url, '-O', $pic_file;	# FIXME: make user configurable for eg. curl?
       if (-s $pic_file) {
-          system 'exiftool', '-q', '-P', '-overwrite_original', '-GPSLatitude=' . $last_lat, '-GPSLongitude=' . $last_lon, $pic_file;
+          system 'exiftool', '-q', '-P', '-overwrite_original', "-GPSPosition=${last_lat},${last_lon}", $pic_file;
       } else {
           $DEBUG > 1 && say "Note $last_noteid: skipping geotagging; $pic_file does not exists or failed to download";
           unlink $pic_file;
